@@ -1,0 +1,60 @@
+{%- if run_day == start_date -%}
+SELECT
+  DATE('{{ run_day }}') as day,
+  adobe_tracking_id,
+{%- for feature in features %}
+{%- for aggregation in aggregations %}
+{%- for aggregation_window in aggregation_windows %}
+{%- if loop.first %}
+  IFNULL({{ feature }}, 0) AS {{ aggregation }}_{{feature}}_{{window_type}}_{{aggregation_window}},
+{%- else -%}
+  NULL AS {{ aggregation }}_{{feature}}_{{window_type}}_{{aggregation_window}},
+{%- endif -%}
+{%- endfor -%}
+{%- endfor -%}
+{%- endfor %}
+FROM
+  {{ upstream_table }}  as todays_data
+WHERE
+  day = '{{ run_day }}'
+{%- else -%}
+with reference_map as (
+{{reference_map}}
+)
+SELECT
+  reference_map.day,
+  reference_map.adobe_tracking_id,
+{%- for feature in features %}
+{%- for aggregation in aggregations %}
+{%- for aggregation_window in aggregation_windows %}
+CASE
+  WHEN '{{aggregation}}' = 'cumulative_sum'
+    THEN
+      CASE
+        WHEN DATE_ADD(DATE(reference_day), interval {{ (aggregation_window  * window_length) - window_length }} {{window_type}}) = '{{run_day}}'
+          THEN IFNULL(todays_data.{{feature}}, 0)
+        WHEN DATE_ADD(DATE(reference_day), interval {{ (aggregation_window  * window_length) - window_length}} {{window_type}}) < '{{run_day}}'
+          AND '{{run_day}}' < DATE_ADD(DATE(reference_day), interval {{ aggregation_window * window_length }} {{ window_type }})
+            THEN yesterdays_data.{{ aggregation }}_{{feature}}_{{ window_type }}_{{aggregation_window}} + IFNULL(todays_data.{{feature}}, 0)
+        WHEN '{{run_day}}' >= DATE_ADD(DATE(reference_day), interval {{ aggregation_window * window_length}} {{ window_type }})
+          THEN yesterdays_data.{{ aggregation }}_{{feature}}_{{ window_type }}_{{aggregation_window}}
+        ELSE Null
+      END
+END AS {{ aggregation }}_{{feature}}_{{ window_type }}_{{aggregation_window}},
+{%- endfor -%}
+{%- endfor -%}
+{%- endfor %}
+FROM
+  reference_map
+LEFT JOIN
+  {{ upstream_table }} as todays_data
+{# this is an ASSUMPTION #}
+USING(adobe_tracking_id)
+LEFT JOIN
+  {{ destination_table_id }}  AS yesterdays_data
+{# this is an ASSUMPTION #}
+on todays_data.adobe_tracking_id = yesterdays_data.adobe_tracking_id
+AND DATE_SUB(todays_data.day, INTERVAL 1 day) = yesterdays_data.day
+WHERE
+  todays_data.day = '{{ run_day }}'
+{% endif %}

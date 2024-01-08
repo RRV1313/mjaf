@@ -1,0 +1,61 @@
+{%- if run_day == start_date -%}
+SELECT
+  DATE('{{ run_day }}') as day,
+  adobe_tracking_id,
+{%- for feature in features %}
+{%- for aggregation in aggregations %}
+{%- for window_length in window_lengths %}
+  IFNULL({{ feature }}, 0) AS {{ aggregation }}_{{feature}}_{{window_type}}_{{window_length}},
+{%- endfor -%}
+{%- endfor -%}
+{%- endfor %}
+FROM
+  {{ upstream_table }}  as todays_data
+WHERE
+  day = '{{ run_day }}'
+{%- else -%}
+SELECT
+  DATE('{{ run_day }}') as day,
+  COALESCE(todays_data.adobe_tracking_id, yesterdays_data.adobe_tracking_id) as adobe_tracking_id,
+{%- for feature in features %}
+{%- for aggregation in aggregations %}
+{%- for window_length in window_lengths %}
+CASE
+  WHEN yesterdays_data.{{ aggregation }}_{{feature}}_{{ window_type }}_{{ window_length}} is not null
+    THEN
+    CASE
+      WHEN '{{ aggregation }}' = 'cumulative_sum'
+      THEN
+        IFNULL(todays_data.{{ feature }}, 0) + IFNULL(yesterdays_data.{{ aggregation }}_{{feature}}_{{ window_type }}_{{ window_length}}, 0) - IFNULL(previous_{{ window_length }}_{{window_type}}.{{feature}}, 0)
+      END
+  ELSE todays_data.{{ feature }}
+END AS {{ aggregation }}_{{feature}}_{{ window_type }}_{{ window_length}},
+{%- endfor -%}
+{%- endfor -%}
+{%- endfor %}
+FROM
+  {{ upstream_table }} as todays_data
+{# this is an ASSUMPTION #}
+{%- for window_length in window_lengths %}
+FULL OUTER JOIN
+(
+  SELECT
+    adobe_tracking_id,
+  {%- for feature in features %}
+    {{feature}},
+  {%- endfor -%}
+  FROM
+    {{ upstream_table }}
+  WHERE
+    day = DATE_SUB('{{ run_day }}', INTERVAL {{ window_length }} {{ window_type }})
+) AS previous_{{ window_length }}_{{window_type}}
+USING (adobe_tracking_id)
+{%- endfor %}
+FULL OUTER JOIN
+  {{ destination_table_id }}  AS yesterdays_data
+{# this is an ASSUMPTION #}
+  on todays_data.adobe_tracking_id = yesterdays_data.adobe_tracking_id
+  AND DATE_SUB(todays_data.day, INTERVAL 1 day) = yesterdays_data.day
+WHERE
+  todays_data.day = '{{ run_day }}'
+{% endif %}

@@ -1,0 +1,11 @@
+SELECT
+     report_date                                                 AS day,
+     adobe_tracking_id                                           AS adobe_tracking_id,
+     max(IF(trial_flag, 1, 0))                                   AS is_trialist
+FROM
+     `{{ data_env }}.PeacockDataMartSilver.SILVER_USER`
+WHERE
+     report_date = '{{run_day}}'
+GROUP BY
+     report_date,
+     adobe_tracking_id

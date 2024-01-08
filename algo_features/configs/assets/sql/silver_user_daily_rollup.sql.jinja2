@@ -1,0 +1,28 @@
+SELECT
+    report_date                                                                  AS day,
+    adobe_tracking_id                                                            AS adobe_tracking_id,
+    CASE
+        WHEN entitlement != 'Free'
+        AND bundling_partner = 'N/A' THEN 1
+        ELSE 0
+    END                                                                         AS is_upgrade_user_trial,
+    CASE
+        WHEN paying_account_flag = 'Paying' THEN 0
+        WHEN churn_type IN ('SYSTEM_CANCELLED', 'AGENT_CANCELLED') THEN -1
+        ELSE 1
+    END                                                                         AS is_downgrade_user,
+    CASE
+        WHEN trial_flag = FALSE
+        AND entitlement != 'Free'
+        AND bundling_partner = 'N/A' THEN 1
+        WHEN entitlement = 'Premium+' THEN 1
+        ELSE 0
+    END                                                                         AS is_upgrade_user,
+    DATE_DIFF(report_date, last_visit_date, day)                                AS last_view_gap,
+    last_visit_status                                                           AS last_visit_gap_bin,
+    video_watched_trailing14                                                    AS video_watched_trailing14,
+    video_watched_trailing30                                                    AS video_watched_trailing30,
+FROM
+    `{{ data_env }}.PeacockDataMartSilver.SILVER_USER`
+WHERE
+    report_date = '{{ run_day }}'

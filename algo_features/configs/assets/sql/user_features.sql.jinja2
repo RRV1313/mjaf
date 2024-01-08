@@ -1,0 +1,11 @@
+SELECT
+	*
+FROM
+	{% for upstream_table in upstream_tables -%}
+	{% if loop.first %}
+	(SELECT * FROM `{{ algo_project }}.algo_features.{{ upstream_table }}` WHERE day = "{{ run_day }}")
+	{% else %}
+	FULL OUTER JOIN (SELECT * FROM `{{ algo_project }}.algo_features.{{ upstream_table }}` WHERE day = "{{ run_day }}")
+	USING(day, adobe_tracking_id)
+	{% endif %}
+	{% endfor -%}

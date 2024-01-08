@@ -1,0 +1,111 @@
+import dataclasses
+from datetime import timedelta
+import functools
+import json
+from typing import Any
+
+from airflow import models
+from airflow.models import variable
+from airflow.providers.google.cloud.operators import kubernetes_engine
+from airflow.utils import task_group
+from dateutil import parser
+
+
+@dataclasses.dataclass
+class AirflowEnvironmentVariables:
+    cluster_project: str = variable.Variable.get(key="CLUSTER_PROJECT")
+    tag: str = variable.Variable.get(key="TAG")
+    cluster_name: str = variable.Variable.get(key="CLUSTER_NAME")
+    cluster_location: str = variable.Variable.get(key="CLUSTER_LOCATION")
+    namespace: str = variable.Variable.get(key="NAMESPACE")
+    algo_project: str = variable.Variable.get(key='ALGO_PROJECT')
+
+
+environment_variables = AirflowEnvironmentVariables()
+
+def get_operator(  # noqa: PLR0913
+    task_id: str,
+    config_path: str,
+    pipe: str,
+	action: str,
+	parameters: dict[str, Any],
+    dag: models.DAG,
+    environment_variables: AirflowEnvironmentVariables,
+) -> kubernetes_engine.GKEStartPodOperator:
+    return kubernetes_engine.GKEStartPodOperator(
+        task_id=task_id,
+        cmds=[
+            "python",
+            "pipelines/entrypoint.py",
+            "--config_path",
+            config_path,
+            "--pipe",
+            pipe,
+            "--action",
+            action,
+            "--parameters",
+            json.dumps(obj=parameters | {"run_day": "{% raw %}{{ ds }}{% endraw %}"}),
+        ],
+        env_vars={
+            "AIRFLOW_VAR_ALGO_PROJECT": environment_variables.algo_project,
+        },
+        dag=dag,
+        project_id=environment_variables.cluster_project,
+        cluster_name=environment_variables.cluster_name,
+        location=environment_variables.cluster_location,
+        is_delete_operator_pod=True,
+        namespace=environment_variables.namespace,
+        gcp_conn_id="gcp_conn",
+        service_account_name='algo-features-sa',
+        use_internal_ip=True,
+        image_pull_policy="Always",
+        startup_timeout_seconds=1000,
+        get_logs=True,
+        log_events_on_failure=True,
+        name="algo-features",
+        image=f"us-west2-docker.pkg.dev/res-nbcupea-mgmt-003/algo-docker/offline:{environment_variables.tag}",
+        retries=3,
+        retry_delay=timedelta(hours=1)
+    )
+
+
+
+
+with models.DAG(
+	dag_id='{{ pipeline.name }}',
+	schedule_interval='{{ pipeline.schedule.cron }}',
+	start_date=parser.parse('{{ pipeline.schedule.start }}'),
+    max_active_runs=1,
+    catchup=False,
+{% for key, value in dag_kwargs %}
+	{{ key }} = {{ value }},
+{% endfor -%}
+) as dag:
+	operator = functools.partial(
+		get_operator,
+		dag=dag,
+		environment_variables=environment_variables,
+	)
+	{% for pipe in pipeline.pipes -%}
+	with task_group.TaskGroup(group_id='{{ pipe.name }}') as {{ pipe.name }}:
+
+		{% for action in pipe.actions -%}
+		{{ action.name.lower() }} = operator(
+			task_id='{{ action.name }}',
+            config_path='{{ pipeline.config_path }}',
+            pipe='{{ pipe.name }}',
+			action='{{ action.action }}',
+			parameters={{ action.parameters }},
+		)
+		{% endfor %}
+		{% for action in pipe.actions if action.upstream %}
+		{% for upstream_task in action.upstream %}
+		{{ upstream_task.lower() }} >> {{ action.name.lower() }}
+	{% endfor %}
+	{% endfor %}
+	{% endfor %}
+	{% for pipe in pipeline.pipes if pipe.upstream is defined -%}
+	{%- for upstream in pipe.upstream %}
+	{{ upstream}} >> {{ pipe.name }}
+    {%  endfor -%}
+	{% endfor %}

@@ -1,0 +1,29 @@
+WITH
+  date_map AS(
+  SELECT
+    DATE('{{ run_day }}') AS day,
+    previous_day
+  FROM
+    UNNEST(GENERATE_DATE_ARRAY(DATE('{{ run_day }}') - 60, '{{ run_day }}')) AS previous_day )
+SELECT
+  date_map.day,
+  adobe_tracking_id,
+{% for aggregation_window in aggregation_windows -%}
+{% for aggregation in aggregations -%}
+{% for feature in features -%}
+{{ aggregation }}(IF(previous_day > DATE('{{ run_day }}') - {{ aggregation_window }}, IFNULL({{ feature }}, 0), NULL)) AS {{ feature }}_{{ aggregation.lower() }}_{{ aggregation_window }},
+{% endfor %}
+{% endfor %}
+{% endfor %}
+FROM
+  `{{ algo_project }}.algo_features.silver_video_daily_rollup` AS t
+INNER JOIN
+  date_map
+ON
+  date_map.previous_day = t.day
+WHERE
+  t.day <= '{{ run_day }}'
+  AND t.day > DATE('{{ run_day }}') - 60
+GROUP BY
+  date_map.day,
+  adobe_tracking_id

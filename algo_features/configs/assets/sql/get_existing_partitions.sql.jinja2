@@ -1,0 +1,14 @@
+SELECT
+	DISTINCT PARSE_DATE('%Y%m%d', partition_id) AS days
+FROM (
+	SELECT
+		DISTINCT partition_id
+	FROM
+		`{{ project }}.{{ dataset }}.INFORMATION_SCHEMA.PARTITIONS`
+	WHERE
+		table_name = '{{ table }}'
+		AND partition_id != '__NULL__'
+		AND total_rows > 0
+)
+WHERE
+	PARSE_DATE('%Y%m%d', partition_id) <= '{{ run_day }}'

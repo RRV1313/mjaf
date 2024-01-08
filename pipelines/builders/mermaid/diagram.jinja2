@@ -1,0 +1,7 @@
+---
+title: {{pipeline.name}}
+---
+graph
+{% for edge in pipeline.actions.edges -%}
+{{' ---> '.join(edge) }}
+{% endfor %}

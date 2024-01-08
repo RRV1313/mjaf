@@ -1,0 +1,233 @@
+name: user_features
+upstream: [silver_user_daily_rollup, silver_video_daily_rollup, silver_video_daily_rollup_agg, trial_features, silver_video_all_time_rollup]
+schedule:
+  cron: "0 12 * * *"
+  start: "2023-10-05"
+resource:
+  name: ManagedBigQueryTable
+  start_date: "2021-01-01"
+  partition_field: day
+  upstream_table_names: [silver_user_daily_rollup, silver_video_daily_rollup, silver_video_daily_rollup_agg, trial_features, silver_video_all_time_rollup]
+---
+name: silver_video_daily_rollup
+upstream: [silver_video]
+resource:
+  name: ManagedBigQueryTable
+  start_date: "2021-01-01"
+  partition_field: day
+---
+name: silver_video_all_time_rollup
+upstream: [silver_video_daily_rollup]
+resource:
+  name: ManagedBigQueryTable
+  start_date: "2021-01-01"
+  partition_field: day
+  recursive: True
+  recursive_suffix: all_time
+  join_key: adobe_tracking_id
+  accumulation_method: cumulative_sum
+---
+name: silver_video
+resource:
+  name: ExternalBigQueryTable
+  dataset: PeacockDataMartSilver
+  table_name: SILVER_VIDEO
+actions:
+  - check_partition
+---
+name: silver_user
+resource:
+  name: ExternalBigQueryTable
+  dataset: PeacockDataMartSilver
+  table_name: SILVER_USER
+actions:
+  - check_partition
+---
+name: silver_video_daily_rollup_agg
+resource:
+  name: ManagedBigQueryTable
+  start_date: "2021-01-01"
+  partition_field: day
+  template_fields:
+    aggregation_windows: [7, 30, 60]
+    aggregations: [SUM, AVG]
+    features: [
+      android_device_seconds_played,
+      androidtv_device_seconds_played,
+      chromecast_device_seconds_played,
+      cox_device_seconds_played,
+      firetv_device_seconds_played,
+      ios_device_seconds_played,
+      lg_device_seconds_played,
+      playstation_device_seconds_played,
+      roku_device_seconds_played,
+      samsung_device_seconds_played,
+      tvos_device_seconds_played,
+      vidaa_device_seconds_played,
+      vizio_device_seconds_played,
+      web_device_seconds_played,
+      xbox_device_seconds_played,
+      xclass_device_seconds_played,
+      xfinity_x1_device_seconds_played,
+      action_adventure_genre_seconds_played,
+      comedy_genre_seconds_played,
+      crime_genre_seconds_played,
+      documentary_genre_seconds_played,
+      drama_genre_seconds_played,
+      horror_genre_seconds_played,
+      kids_genre_seconds_played,
+      mystery_suspense_genre_seconds_played,
+      na_genre_seconds_played,
+      news_genre_seconds_played,
+      reality_genre_seconds_played,
+      sci_fi_fantasy_genre_seconds_played,
+      thriller_genre_seconds_played,
+      tv_genre_seconds_played,
+      wwe_genre_seconds_played,
+      usa_track_field_genre_seconds_played,
+      sneak_peek_genre_seconds_played,
+      ski_jumping_genre_seconds_played,
+      world_rugby_seven_genre_seconds_played,
+      winter_sports_genre_seconds_played,
+      imsa_genre_seconds_played,
+      romance_genre_seconds_played,
+      tvg_genre_seconds_played,
+      bobsledding_genre_seconds_played,
+      lifestyle_genre_seconds_played,
+      indy_500_genre_seconds_played,
+      para_alpine_skiing_genre_seconds_played,
+      sports_genre_seconds_played,
+      football_genre_seconds_played,
+      mlb_genre_seconds_played,
+      gymnastics_genre_seconds_played,
+      horse_racing_genre_seconds_played,
+      movies_genre_seconds_played,
+      international_genre_seconds_played,
+      game_show_genre_seconds_played,
+      the_soccer_tournament_genre_seconds_played,
+      mystery_genre_seconds_played,
+      holiday_genre_seconds_played,
+      rugby_world_cup_genre_seconds_played,
+      wrestling_genre_seconds_played,
+      premier_league_genre_seconds_played,
+      ice_skating_genre_seconds_played,
+      track_field_genre_seconds_played,
+      speed_skating_genre_seconds_played,
+      military_war_genre_seconds_played,
+      musical_genre_seconds_played,
+      unknown_genre_seconds_played,
+      short_track_genre_seconds_played,
+      comedy_drama_genre_seconds_played,
+      nfl_genre_seconds_played,
+      tennis_genre_seconds_played,
+      ecw_genre_seconds_played,
+      live_205_genre_seconds_played,
+      latest_episode_genre_seconds_played,
+      cross_country_skiing_genre_seconds_played,
+      motor_sports_genre_seconds_played,
+      raw_genre_seconds_played,
+      nxt_uk_genre_seconds_played,
+      curling_genre_seconds_played,
+      diamond_league_genre_seconds_played,
+      ncaa_genre_seconds_played,
+      auto_racing_genre_seconds_played,
+      adventure_genre_seconds_played,
+      wcw_genre_seconds_played,
+      competition_genre_seconds_played,
+      martial_arts_genre_seconds_played,
+      indy_nxt_genre_seconds_played,
+      sled_hockey_genre_seconds_played,
+      indy_lights_genre_seconds_played,
+      talk_genre_seconds_played,
+      figure_skating_genre_seconds_played,
+      pro_wrestling_genre_seconds_played,
+      skeleton_genre_seconds_played,
+      nature_genre_seconds_played,
+      hockey_genre_seconds_played,
+      golf_genre_seconds_played,
+      music_genre_seconds_played,
+      supercross_genre_seconds_played,
+      travel_genre_seconds_played,
+      luge_genre_seconds_played,
+      weightlifting_genre_seconds_played,
+      biathlon_genre_seconds_played,
+      pro_motocross_genre_seconds_played,
+      college_hockey_genre_seconds_played,
+      tv14_genre_seconds_played,
+      variety_genre_seconds_played,
+      anime_genre_seconds_played,
+      cycling_genre_seconds_played,
+      food_genre_seconds_played,
+      baseball_genre_seconds_played,
+      entertainment_genre_seconds_played,
+      six_nations_genre_seconds_played,
+      health_fitness_genre_seconds_played,
+      swimming_genre_seconds_played,
+      game_show_contest_genre_seconds_played,
+      nxt_genre_seconds_played,
+      business_finance_genre_seconds_played,
+      cartoon_animation_genre_seconds_played,
+      premiership_rugby_genre_seconds_played,
+      fantasy_genre_seconds_played,
+      animation_genre_seconds_played,
+      science_technology_genre_seconds_played,
+      action_genre_seconds_played,
+      ceremony_genre_seconds_played,
+      snowboarding_genre_seconds_played,
+      history_biography_genre_seconds_played,
+      basketball_genre_seconds_played,
+      stand_up_comedy_genre_seconds_played,
+      soccer_genre_seconds_played,
+      nitro_rallycross_genre_seconds_played,
+      weathertech_series_genre_seconds_played,
+      boxing_genre_seconds_played,
+      para_biathlon_genre_seconds_played,
+      today_genre_seconds_played,
+      wheelchair_curling_genre_seconds_played,
+      olympics_genre_seconds_played,
+      freestyle_skiing_genre_seconds_played,
+      pga_genre_seconds_played,
+      world_athletics_genre_seconds_played,
+      western_genre_seconds_played,
+      ice_hockey_genre_seconds_played,
+      religion_genre_seconds_played,
+      para_snowboarding_genre_seconds_played,
+      rugby_genre_seconds_played,
+      ntt_indycar_series_genre_seconds_played,
+      smackdown_genre_seconds_played,
+      extreme_sports_genre_seconds_played,
+      sci_fi_genre_seconds_played,
+      animals_genre_seconds_played,
+      nordic_combined_genre_seconds_played,
+      nascar_genre_seconds_played,
+      tvpg_genre_seconds_played,
+      alpine_skiing_genre_seconds_played,
+      para_cc_skiing_genre_seconds_played,
+      college_football_genre_seconds_played,
+      indycar_genre_seconds_played,
+      usfl_genre_seconds_played,
+      paralympic_genre_seconds_played,
+      large_screen_seconds,
+      num_daily_sessions,
+      num_views_completed,
+      num_views_started,
+      num_views_reached_perc_25_perc,
+      num_views_reached_perc_50_perc,
+      num_views_reached_perc_75_perc,
+      small_screen_seconds,
+    ]
+upstream: [silver_video_daily_rollup]
+---
+name: silver_user_daily_rollup
+upstream: ['silver_user']
+resource:
+  name: ManagedBigQueryTable
+  start_date: "2021-01-01"
+  partition_field: day
+---
+name: trial_features
+upstream: ['silver_user']
+resource:
+  name: ManagedBigQueryTable
+  start_date: "2021-01-01"
+  partition_field: day

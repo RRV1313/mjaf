@@ -1,0 +1,17 @@
+{% if run_day == start_date %}
+{{ query }}
+{% else %}
+SELECT
+{{join_key}},
+DATE("{{run_day}}") as {{ partition_field }},
+{{ accumulation_method }}
+FROM
+(
+	SELECT  *
+	FROM `{{ destination_table_id }}`
+	WHERE {{ partition_field }} = DATE('{{ run_day }}') - 1
+) AS a
+FULL OUTER JOIN
+({{ query}})  as b
+USING ({{ join_key }})
+{% endif %}

@@ -1,0 +1,5 @@
+# This is the initial commit to a new repository
+# for compliance and governance, all repos should
+# have this file
+/ci/ @nbcudtc/sre
+/.github/CODEOWNERS @nbcudtc/sre
